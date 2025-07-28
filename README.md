@@ -1,6 +1,3 @@
-# IoT_Backend_Device_ESP32
-ESP32-based IoT device with HTTPS, WebSocket, and Poisson fault logic
-
 # IoT Backend Device Simulation via ESP32 (C++)
 
 This project implements a complete simulation of an IoT device backend system using an **ESP32** microcontroller. It communicates securely with a cloud server via HTTPS and real-time WebSocket (Socket.IO) connections, simulates fault conditions using a **Poisson process**, and provides **audible and visual alerts** using onboard peripherals.
