@@ -18,7 +18,7 @@ This device acts as a backend simulator that:
 
 ## 🧪 Key Features
 
-- ✅ **Session Initialization**: Secure HTTPS request to `/dv/DvOp` endpoint.
+- ✅ **Session Initialization**: Secure HTTPS request to `/device/deviceopen` endpoint.
 - 🔄 **Real-Time Communication**: WebSocket with `ping/pong` heartbeats.
 - 📏 **Sensor Integration**: HC-SR04 for real-world proximity measurement.
 - ⚠️ **Fault Detection**: Uses Poisson randomization to trigger fault levels.
