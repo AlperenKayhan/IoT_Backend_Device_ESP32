@@ -5,53 +5,50 @@
 #include <SocketIOclient.h>
 #include <Preferences.h>
 
-#include <driver/i2s.h>
-#include <freertos/FreeRTOS.h>
+#include <driver/i2s.h> //I2S library; included for us to use alarm sound
+#include <freertos/FreeRTOS.h>//SSL/TLS
 #include <freertos/task.h>
-#include <math.h>
+#include <math.h>//For poisen calculation, we need to include it
 
-// === Audio & I2S configuration ===
-#define I2S_PORT       I2S_NUM_0
-#define SAMPLE_RATE    44100      // in Hz
-#define TONE_FREQ      1000       // tone frequency in Hz
-#define DURATION_MS    200        // how long to play the tone (ms)
-#define DMA_BUF_LEN    1024       // number of samples per DMA buffer
+/*######## Audio & I2S configuration - START ########*/
+#define I2S_PORT I2S_NUM_0
+#define SAMPLE_RATE 44100 // Amount of Heartz(Hz)
+#define TONE_FREQ 1000 // Our Tone's frequency in Hz
+#define DURATION_MS 200 // milisecond time for our tone to be played.
+#define DMA_BUF_LEN 1024 // amount of samples that per that included DMA buffer
+/*######## Audio & I2S configuration - END ##########*/
 
-// === Configuration ===
-#define PING_INTERVAL  5000       // ms between ping events
+/*######## LED Configration  Configuration - START ########*/
+/*We did not use this part after, we decide to not use to our system.
+Due to later found it unnecessary*/
+#define PING_INTERVAL  5000 // Ping interval is distance between ping events.
 #define LED_GPIO       12
 #define LED_BRIGHT     100
 #define LED_COUNT      1
+/*######## LED Configration  Configuration - END ########*/
 
-
-#define DURATION_MS      10000   // total alarm length
+/*######## ALARM Tuning Setting - START ########*/
+/*NOTE THAT: when the alaram duration is over it is still contunio to run.
+Because, Alarm sound is in the loop that make the soun run on a bit longer*/
+#define DURATION_MS      10000 // total alarm duration
 #define BEEP_MS            200   // how long each beep lasts
 #define PAUSE_MS           500   // silence between beeps
 #define BEEP_AMPLITUDE   10000   // lower than 32767 for quieter output
+/*######## ALARM Tuning Setting - END ########*/
 
+/*########  HC‑SR04 - START ########*/
+/* HC-SR04 sensor is a sensor that allowed us to read distance between sensor the fan blade.
+Sensor read the distance at 5 second time intervall*/
+#define ULTRASONIC_TRIG_PIN   32 // it is  a pin locaation for TRIG(Trigger)
+#define ULTRASONIC_ECHO_PIN   33 // it is  a pin locaation for  ECHO
+#define DISTANCE_THRESHOLD_CM 30 // if the threshold did not excited amount of cm to trigger a warning
+#define WARNING_THRESHOLD     3 // warnings before reboot
+/*########  HC‑SR04 - END ########*/
 
-// ─── HC‑SR04 ────────────────────────────────────────────────
-#define ULTRASONIC_TRIG_PIN   32     // wired to TRIG
-#define ULTRASONIC_ECHO_PIN   33     // wired to ECHO
-#define DISTANCE_THRESHOLD_CM 30     // cm to trigger a warning
-#define WARNING_THRESHOLD     3      // # of consecutive warnings before reboot
-
-int warningCount = 0;               // global counter
-
-// === Wi‑Fi Credentials ===
-const char* WIFI_SSID     = "ALP";
-const char* WIFI_PASSWORD = "123456789";
-
-// === Server ===
-static const char* SERVER_HOST = "dev-sample.sample.com.tr";
-
-// === Globals ===
-Preferences       prefs;
-Adafruit_NeoPixel strip(LED_COUNT, LED_GPIO, NEO_GRB + NEO_KHZ800);
-SocketIOclient    socketIO;
-
-String g_sessionId = "";
-
+/*########  Global Variables - START ########*/
+/* Tese are the global variables that we utilize in our code. Which their existance are
+multifunction due to that nature. We declare them on a global to also reach them easly */
+int warningCount = 0; //Warninig Counter
 int g_StrugleCount = 0;
 int g_SafeMod_Count = 0;
 unsigned long lastPingTime = 0;
@@ -61,33 +58,57 @@ double lambda = 5.0;
 int ErrorSimulationSentinelVal = 0;
 int StrugleCount = 0;
 int Reboot_COUNT = 0;
-
 int System_ShutDOWN = 0;
+String g_sessionId = "";
 
-// ----------------------------------------------------------------------------
-//  Build the /dv/DvOp query path, using stored session_id if any
+/*########  Global Variables - END ##########*/
+
+/*########  WiFi Declarations - START ########*/
+/* Here we declare our character pointers to record our used SSID & Passsword. */
+const char* WIFI_SSID     = "ALP";
+const char* WIFI_PASSWORD = "123456789";
+/*#########  WiFi Declarations - END #########*/
+
+/*######## SERVER HOST - START ########*/
+/* Declaration of server host. That we use in this case, I am using a different name to not 
+show the true name. Due to sportsmanship towards the company that I interned.*/ 
+static const char* SERVER_HOST = "dev-sample.sample.com.tr";
+/*######## SERVER HOST - END ########*/
+
+/*######## Global Elements - START ########*/
+/* This is where we declared the names of the used 
+variables that will later implenmented on our code*/
+Preferences prefs; /* we add the preferences to record our seassion_id on device */
+Adafruit_NeoPixel strip(LED_COUNT, LED_GPIO, NEO_GRB + NEO_KHZ800);/*LED description that exists previous imğlementatipon*/
+SocketIOclient socketIO; /*Socket io implementation that we need to use to make Web Socket connection*/
+/*######### Global Elements - END #########*/
+
+
+
+/* ###################### URL build - START ######################*/
 std::string buildDvOpPath()
-{
-  String prev = prefs.getString("session_id", "");
+{/* to send an open request to the database, we need to first build our own URL with
+various parameters. Some names may be inconsistent due to not sharing company methods in detail.*/
+  String prev = prefs.getString("session_id", "");/* to get our seassion id we firstly called session_id from "prefs" */
   std::string sParam(prev.c_str());
-  std::string path = "/devices/deviceopen"; // -> Sample names
+  std::string path = "/devices/dveOpen"; // -> Sample names
   path += "pts=" + std::to_string(millis());
-  path += "&S[S]=" + sParam;
-  path += "&S[ptof]=180&S[country]=225&S[lang]=tr";
-  path += "&S[serial_no]=251306200097";
+  path += "&S[S]=" + sParam; //Inserting Seassion id that readed aon prefs
+  path += "&S[ptof]=180&S[country]=225&S[lang]=tr";// essantial descirebed
+  path += "&S[serial_no]=251306200097";//device id, whic we need to record our device's oın ERP system
   path += "&S[serial_no_hw]="  + std::string("724564882000"); 
-  path += "&d_short_code=sample_devic";
-  path += "&d_firmware=sample_device";
-  path += "&d_mac_id="macAddres"";
-  path += "&d_local_ip=" + std::string(WiFi.localIP().toString().c_str());
+  path += "&d_short_code=sample_devic";//Device name -> important for ERP to recognize
+  path += "&d_firmware=sample_device";//Device name -> important for ERP to recognize
+  path += "&d_mac_id="macAddres""; //Unique Device MAC Address. 
+  path += "&d_local_ip=" + std::string(WiFi.localIP().toString().c_str()); //Unige WiFi IP
   path += "&d_oper=Prod&d_mdl_id=9000200&d_sites_id=9000200";
   return path;
 }
+/* ###################### URL build - END ######################*/
 
-// ----------------------------------------------------------------------------
-//  Create a Socket.IO [ eventName, eventData ] message
+/* ###################### Socket.IO Creation - START ######################*/
 std::string create_socket_message(const std::string& eventName, const std::string& message)
-{
+{// To create the socket message in sending as out to process as message later.
   DynamicJsonDocument doc(1024);
   JsonArray arr = doc.to<JsonArray>();
   arr.add(eventName.c_str());
@@ -96,8 +117,12 @@ std::string create_socket_message(const std::string& eventName, const std::strin
   serializeJson(doc, out);
   return out;
 }
-// ----------------------------------------------------------------------------
-//  Initialize the I²S peripheral for 16‑bit stereo at SAMPLE_RATE
+/* ###################### Socket.IO Creation - END ######################*/
+
+/* ###################### initI2S - START ######################*/
+/*initI2S is to used to generate analog electiracal pulses to help us 
+to create binary alarm sound. Which, we used "MAX98357A" and then send the generated
+sound to speakers. */
 void initI2S() {
   i2s_config_t cfg = {
     .mode                 = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
@@ -121,20 +146,23 @@ void initI2S() {
   i2s_driver_install(I2S_PORT, &cfg, 0, NULL);
   i2s_set_pin(I2S_PORT, &pins);
 }
+/* ###################### initI2S - END ######################*/
 
-// ----------------------------------------------------------------------------
+
+/* ###################### playErrorTone - START ######################*/
 //  Play a sine‐tone error alert over I²S
-void playErrorTone() {
-  Serial.println("ERROR TONE PLAYED!!!");
-
-  // Build a single DMA buffer of one square‑wave cycle at reduced amplitude
+void playErrorTone() 
+{/*In this function, we played the sine-time error alert over I2S. Thus, we build
+  single DMA buffer of one square-wave cycle at reduced amplitude*/
+  Serial.println("ERROR TONE PLAYED!!!");// Indicator that "Error tone is playing"
   static bool inited = false;
   static int16_t buffer[DMA_BUF_LEN * 2];
   if (!inited) {
     const int samplesPerPeriod = SAMPLE_RATE / TONE_FREQ;
-    for (int i = 0; i < DMA_BUF_LEN; i += samplesPerPeriod) {
-      for (int j = 0; j < samplesPerPeriod && (i + j) < DMA_BUF_LEN; ++j) {
-        // square wave: half +amplitude, half –amplitude
+    for (int i = 0; i < DMA_BUF_LEN; i += samplesPerPeriod) 
+    {
+      for (int j = 0; j < samplesPerPeriod && (i + j) < DMA_BUF_LEN; ++j) 
+      {// square wave: half  positive amplitude and  half  negative one.
         int16_t s = (j < samplesPerPeriod/2) ?  BEEP_AMPLITUDE : -BEEP_AMPLITUDE;
         buffer[2*(i+j)  ] = s;
         buffer[2*(i+j)+1] = s;
@@ -145,46 +173,58 @@ void playErrorTone() {
 
   size_t bytesWritten;
   unsigned long startTime = millis();
-  while (millis() - startTime < DURATION_MS) {
-    // ——— play one burst ———
+  while (millis() - startTime < DURATION_MS)
+  {
     unsigned long beepEnd = millis() + BEEP_MS;
-    while (millis() < beepEnd) {
-      i2s_write(I2S_PORT,
-                buffer,
-                sizeof(buffer),
-                &bytesWritten,
-                pdMS_TO_TICKS(10));
-      socketIO.loop();  // keep the socket alive
+    while (millis() < beepEnd) 
+    {
+      i2s_write(I2S_PORT, buffer, sizeof(buffer), &bytesWritten, pdMS_TO_TICKS(10));
+      socketIO.loop();  //Helper to keep socket allive
     }
 
-    // ——— pause between beeps ———
+    // It makes a pause between beeps!!
     unsigned long silentEnd = millis() + PAUSE_MS;
-    while (millis() < silentEnd) {
+    while (millis() < silentEnd) 
+    {
       socketIO.loop();
       delay(10);
     }
   }
 }
-// ─── readDistanceCM() ────────────────────────────────────────
-float readDistanceMeter() {
-  // send 10 µs pulse
+/* ###################### playErrorTone - END ######################*/
+
+
+
+/* ###################### ReadDistance - Start ######################*/
+float readDistanceMeter()
+{/* Commanly used distance reader*/
   digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
   delayMicroseconds(2);
   digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
 
-  // measure echo (timeout 30 ms)
   long duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH, 30000UL);
-  if (duration == 0) return -1.0f;            // no echo
-  return (duration * 0.034f) / 2.0f;          // cm
+  if (duration == 0) return -1.0f;
+  return (duration * 0.034f) / 2.0f;
 }
+/* ###################### ReadDistance - END ######################*/
 // ----------------------------------------------------------------------------
 //  Poisson random for error simulation
-int poissonRandom(double lambda) {
+/* ###################### Poisson Random - START ######################*/
+int poissonRandom(double lambda)
+{/* we use this function to generate our random values to between in the possible interval
+  as well as allowed us to generate distinctive values. Thus, it might be possible to 
+  have libraries that allowed us to generate 64 format random values to make them even more 
+  related &distinctive. Yet, adding those libraries may increase the weight of our ESP32 code. 
+  Which we don't want because even this version is very heavy.*/
+
+  /* # In future Qt/C++ implementation, there is a  high possibility that I'll be using 
+  "QRandomGenerator64" to generate my random values. */
   double L = exp(-lambda), p = 1.0;
   int k = 0;
-  do {
+  do
+  {
     k++;
     p *= ((double)rand() / RAND_MAX);
   } while (p > L);
@@ -194,20 +234,23 @@ int poissonRandom(double lambda) {
 // ----------------------------------------------------------------------------
 //  Handle incoming Socket.IO frames
 void socketIOEvent(socketIOmessageType_t type, uint8_t* payload, size_t len) {
-  switch (type) {
-    case sIOtype_DISCONNECT:
+  switch (type){
+    case sIOtype_DISCONNECT://if our socket connection is disconnected either from a network or the ERP itself
       socketConnected = false;
       Serial.println("[IOc] Disconnected!");
       break;
 
-    case sIOtype_CONNECT:
+    case sIOtype_CONNECT:// if connection successful.
       socketConnected = true;
       Serial.printf("[IOc] Connected to url: %s\n", payload);
       socketIO.send(sIOtype_CONNECT, "/");
       socketIO.sendEVENT(message_register.c_str());
       break;
 
-    case sIOtype_EVENT: {
+    case sIOtype_EVENT: 
+      {/*After a succesful connection, we are arriving at "SIOtype_Envent". Thus, we process the 
+      raw data that we got from payload to process. Then, we spearete our raw data in to two parts
+      frameType and data itsel.*/ 
       String raw = String((char*)payload).substring(0, len);
       DynamicJsonDocument outer(2048);
       if (deserializeJson(outer, raw)) return;
@@ -464,3 +507,4 @@ void loop()
     lastPingTime = millis();
   }
 }
+
