@@ -231,7 +231,7 @@ int poissonRandom(double lambda)
 // ----------------------------------------------------------------------------
 //  Handle incoming Socket.IO frames
 
-/* ###################### SockeetIO Frame - END ######################*/
+/* ###################### SockeetIO Frame - START ######################*/
 void socketIOEvent(socketIOmessageType_t type, uint8_t* payload, size_t len)
 {/* This part of the code handles the incoming message from socketio, and depending on the arrived message, 
 It will proceed with the set tasks. Thus, it can handle the socket messages, the socket connection status, 
@@ -252,59 +252,72 @@ and the socket messages that are sent by the ERP system. */
     case sIOtype_EVENT: 
       {/*After a successful connection, we are arriving at "SIOtype_Envent". Thus, we process the 
       raw data that we got from the  payload. Then, we separated our raw data into two parts
-      frameType and data itself.*/ 
+      frameType and data itself. Which can be simply described as an Application-level event payload.*/ 
       String raw = String((char*)payload).substring(0, len); //Transforming payload into raw data
-      DynamicJsonDocument outer(2048);
-      if (deserializeJson(outer, raw)) return;
+      DynamicJsonDocument outer(2048); //buffer
+      if (deserializeJson(outer, raw)) return; //Abordin if there is json error
 
-      const char* frameType = outer[0];
-      JsonVariant data = outer[1];
+      const char* frameType = outer[0]; //"pong", "m"
+      JsonVariant data = outer[1]; // Frame base specific command
 
       // —— server “pong&ErrorCheck” —— 
       if (strcmp(frameType, "pong") == 0) 
-      {
-        float dist = readDistanceMeter();
+      {/*This heartbeat implementation is very valuable to the ERP system to keep the device open
+      because, if there is no response after a certain amount of time ERP system will shut down the device.
+      So, every 5 seconds, ERP sends a tick to the device device sends a ping*/
+        float dist = readDistanceMeter();// Reads the lates distance hat readed from HC‑SR04 sensor.
         //float Xn = 0;
-        int Anomaly_Count = 0;
+        int Anomaly_Count = 0;/* Anomaly count that we read, if there is more than 20 count as a warning condition 1
+        OR, if there are more than 15 counts as condition 2. The system will shut itself down for self-protection. 
+        Even Tho the error condition is not serioıous */
         if (ErrorSimulationSentinelVal) 
-        {
+        {/* 'ErrorSimulationSentinelVal' is used to start the sensor reading in the system. 
+        Otherwise, it won't start processing the values, even if it was read. */
+          
+          /*###### Strugle Count - START ######*/
+          /* When will the sensor reading start? We also started the count struggle.
+          Struggle Count is always updated when ever the errorsimulation initilize. 
+          It will show how many cycles have been done. We use "Preferences.h" library
+          to store our struggle cun inside the device.*/ 
           StrugleCount++; //This value should be saved inside preference
           prefs.putUInt("Strugle_Count", StrugleCount);
           Serial.println("WARNING: System UNSTABLE");
-
-          double t = 7.0 * (dist*10) + 3.0;      // dist is your double input
-          double Xn = std::fmod(t, 4.0);    // Xn ∈ (–4, +4)
-
+          /*###### Strugle Count - END ######*/
+          
+          double t = 7.0 * (dist*10) + 3.0; // Xn processing
+          double Xn = std::fmod(t, 4.0);
           if (Xn < 0.0) 
-              Xn += 4.0;                    // now Xn ∈ [0, 4)
+              Xn += 4.0;          
           Serial.printf("Xn: %f", Xn);
+
+          /*###### Xn Results - START ######*/
           if (Xn > 0.0 && Xn <= 1.5)
-          {
+          {/* if Xn value between 0 to 1.5, we just increase Anomaly_Count */
             Serial.println("\tCONDITION 1: Propeller Anomaly detected");
             Anomaly_Count++;
             if(Anomaly_Count>20)
-            {
+            {/* Restarting the ESP if the anomaly value exceeds the Anomaly_Count threshold.
+              To put the device in safe mode*/
               Serial.println("\t\tSYSTEM FAILURE: Auto-Rebooting\n");
               delay(100);
               ESP.restart();
             }
           }
-
           else if (Xn > 1.5 && Xn <= 2.1)
-          {
+          {/* if Xn value between 1.5 to 2.1, we just increase Anomaly_Count */
             Serial.println("\tCONDITION 2: Propeller Issue detected");
             Serial.println("\t\tManuel Reboot Adviced");
             Anomaly_Count++;
             if(Anomaly_Count>15)
-            {
+            {/* Restarting the ESP if the anomaly value exceeds the Anomaly_Count threshold.
+              To put the device in safe mode*/
               Serial.println("\t\tSYSTEM FAILURE: Auto-Rebooting");
               delay(100);
               ESP.restart();
             }
           }
-
           else if (Xn > 2.10 && Xn <= 3.10)
-          {
+          {/*if Xn between 2.10 to 3.10, firstly we played the error tone then, shutdown the system.*/
             Serial.println("\tCONDITION 3: Auto Reboot Initiliaze");
             Serial.println("\t\tSYSTEM FAILURE: Auto-Rebooting");
             delay(100);
@@ -312,14 +325,15 @@ and the socket messages that are sent by the ERP system. */
             ESP.restart();
 
           }
-
           else
-          {
+          {/*if Xn otherwise. Thus, more than 3.10. Then, just play the alarm sound and call the loop again. 
+          This condition won't shut down the system; rather, it will give an internal reboot.*/
             Serial.println("\tCONDITION 4: Physical Issue Detected !!");
             Serial.println("\t\tEMERGANT FAILURE: System Shutdown");
             playErrorTone();
             loop();
           }
+          /*###### Xn Results - END ######*/
         }
 
         break;
@@ -328,17 +342,20 @@ and the socket messages that are sent by the ERP system. */
       // —— application “m” messages —— 
       if (strcmp(frameType, "m") == 0)
       {
-        const char* tStr = data["t"];
-        DynamicJsonDocument inner(1024);
+        const char* tStr = data["t"]; // To get inner JSON as string.
+        DynamicJsonDocument inner(1024); // Buffer
         if (deserializeJson(inner, tStr)) return;
-        const char* cmd = inner["f"];
+        const char* cmd = inner["f"];/*function command selector which is helping us to get a 
+        specific command that we internalize from raw data.*/
 
-        if (strcmp(cmd, "send_msg_log") == 0){
+        if (strcmp(cmd, "send_msg_log") == 0)
+        {//Printing the message that was sent from ERP.
           Serial.print("MESSAGE: ");
           Serial.println(inner["msg"] | "");
         }
 
-        else if (strcmp(cmd, "get_d_parameters") == 0) {
+        else if (strcmp(cmd, "get_d_parameters") == 0) 
+        {//Showing the parameters of the device.
           Serial.println("—> Parameters:");
           g_StrugleCount = prefs.getUInt("Strugle_Count", 0);
           Serial.println("    Session ID: " + g_sessionId);
@@ -346,13 +363,15 @@ and the socket messages that are sent by the ERP system. */
           Serial.println(" (Level of System Strugle)");
         }
 
-        else if (strcmp(cmd, "reboot") == 0) {
+        else if (strcmp(cmd, "reboot") == 0)
+        {//Manual Rebooting
           Serial.println("Reboot command received. Restarting…");
           delay(100);
           ESP.restart();
         }
 
-        else if (strcmp(cmd, "changed_parameters") == 0) {
+        else if (strcmp(cmd, "changed_parameters") == 0)
+        {// is to unlock the error simulation
           Serial.println("Fan Sensors initialize");
           ErrorSimulationSentinelVal = 1;
         }
@@ -366,11 +385,11 @@ and the socket messages that are sent by the ERP system. */
       break;
     }
 
-    case sIOtype_ACK:
+    case sIOtype_ACK:// Server ACK to a previous client message. 
       Serial.printf("[IOc] ACK len=%u\n", len);
       break;
 
-    case sIOtype_ERROR:
+    case sIOtype_ERROR: // Socket.IO error frame.
       Serial.printf("[IOc] ERROR len=%u\n", len);
       break;
 
@@ -378,13 +397,13 @@ and the socket messages that are sent by the ERP system. */
       break;
   }
 }
+/* ###################### SockeetIO Frame - END ######################*/
 
 
-// ----------------------------------------------------------------------------
-//  Fetch (or re‑use) session via HTTPS, store it, then start Socket.IO
+/* ###################### SockeetIO Frame - START ######################*/
 void sendDeviceOpenRequest() {
   // build & show the URL
-  std::string path = buildDvOpPath();
+  std::string path = buildDvOpPath(); // building a path to do that, we generate a URL
   Serial.println(" Full URL:");
   Serial.println((String("https://") + SERVER_HOST + path.c_str()).c_str());
 
@@ -426,15 +445,15 @@ void sendDeviceOpenRequest() {
   // prepare Socket.IO
   String cookie = "cookie: S=" + g_sessionId;
   socketIO.setExtraHeaders(cookie.c_str());
-  socketIO.beginSSL(SERVER_HOST, 443, "/socket/EIO=4"); //-> sample
+  socketIO.beginSSL(SERVER_HOST, 443, "/socket/EIO=4"); //-> sample, not true
   socketIO.onEvent(socketIOEvent);
 
   // send registration
-  std::string dg = "{\"n\":\\".........\"r\":\"develop\"}"; -> Sample
+  std::string dg = "{\"n\":\\".........\"r\":\"develop\"}"; //-> Sample, not true
   message_register = create_socket_message("r", dg);
   socketIO.sendEVENT(message_register.c_str());
 
-  // green LED
+  // green LED, Part that we stop using, NOTE: if ESP32 has inbuilt LED, it is still happened to be working.
   strip.setBrightness(LED_BRIGHT); strip.show();
   strip.setPixelColor(0, strip.Color(0,255,0)); strip.show();
 }
@@ -509,5 +528,6 @@ void loop()
     lastPingTime = millis();
   }
 }
+
 
 
