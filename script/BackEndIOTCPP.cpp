@@ -8,28 +8,28 @@
 #include <driver/i2s.h> //I2S library; included for us to use alarm sound
 #include <freertos/FreeRTOS.h>//SSL/TLS
 #include <freertos/task.h>
-#include <math.h>//For poisen calculation, we need to include it
+#include <math.h>//For poison calculation, we need to include it
 
 /*######## Audio & I2S configuration - START ########*/
 #define I2S_PORT I2S_NUM_0
 #define SAMPLE_RATE 44100 // Amount of Heartz(Hz)
 #define TONE_FREQ 1000 // Our Tone's frequency in Hz
-#define DURATION_MS 200 // milisecond time for our tone to be played.
-#define DMA_BUF_LEN 1024 // amount of samples that per that included DMA buffer
+#define DURATION_MS 200 //milliseconds for our tone to be played.
+#define DMA_BUF_LEN 1024 // amount of samples per included DMA buffer
 /*######## Audio & I2S configuration - END ##########*/
 
 /*######## LED Configration  Configuration - START ########*/
-/*We did not use this part after, we decide to not use to our system.
+/*We did not use this part after; we decided not to use it in our system.
 Due to later found it unnecessary*/
-#define PING_INTERVAL  5000 // Ping interval is distance between ping events.
+#define PING_INTERVAL  5000 // Ping interval is the distance between ping events.
 #define LED_GPIO       12
 #define LED_BRIGHT     100
 #define LED_COUNT      1
 /*######## LED Configration  Configuration - END ########*/
 
 /*######## ALARM Tuning Setting - START ########*/
-/*NOTE THAT: when the alaram duration is over it is still contunio to run.
-Because, Alarm sound is in the loop that make the soun run on a bit longer*/
+/*NOTE THAT: when the alarm duration is over, it is still continuous to run.
+Because the alarm sound is in the loop, which makes the sound run on a bit longer*/
 #define DURATION_MS      10000 // total alarm duration
 #define BEEP_MS            200   // how long each beep lasts
 #define PAUSE_MS           500   // silence between beeps
@@ -37,17 +37,17 @@ Because, Alarm sound is in the loop that make the soun run on a bit longer*/
 /*######## ALARM Tuning Setting - END ########*/
 
 /*########  HC‑SR04 - START ########*/
-/* HC-SR04 sensor is a sensor that allowed us to read distance between sensor the fan blade.
-Sensor read the distance at 5 second time intervall*/
+/* HC-SR04 sensor is a sensor that allows us to read the distance between the sensor and the fan blade.
+Sensor reads the distance at 5 5-second time intervals*/
 #define ULTRASONIC_TRIG_PIN   32 // it is  a pin locaation for TRIG(Trigger)
-#define ULTRASONIC_ECHO_PIN   33 // it is  a pin locaation for  ECHO
-#define DISTANCE_THRESHOLD_CM 30 // if the threshold did not excited amount of cm to trigger a warning
+#define ULTRASONIC_ECHO_PIN   33 // it is  a pin location for  ECHO
+#define DISTANCE_THRESHOLD_CM 30 // if the threshold did not exceed a certain amount of cm to trigger a warning
 #define WARNING_THRESHOLD     3 // warnings before reboot
 /*########  HC‑SR04 - END ########*/
 
 /*########  Global Variables - START ########*/
-/* Tese are the global variables that we utilize in our code. Which their existance are
-multifunction due to that nature. We declare them on a global to also reach them easly */
+/* These are the global variables that we utilize in our code. Which of their existences are
+multifunctional due to that nature. We declare them on a global scale to also reach them easily */
 int warningCount = 0; //Warninig Counter
 int g_StrugleCount = 0;
 int g_SafeMod_Count = 0;
@@ -64,30 +64,30 @@ String g_sessionId = "";
 /*########  Global Variables - END ##########*/
 
 /*########  WiFi Declarations - START ########*/
-/* Here we declare our character pointers to record our used SSID & Passsword. */
+/* Here we declare our character pointers to record our used SSID & Password. */
 const char* WIFI_SSID     = "ALP";
 const char* WIFI_PASSWORD = "123456789";
 /*#########  WiFi Declarations - END #########*/
 
 /*######## SERVER HOST - START ########*/
 /* Declaration of server host. That we use in this case, I am using a different name to not 
-show the true name. Due to sportsmanship towards the company that I interned.*/ 
+show the true name. Due to sportsmanship towards the company where I interned.*/ 
 static const char* SERVER_HOST = "dev-sample.sample.com.tr";
 /*######## SERVER HOST - END ########*/
 
 /*######## Global Elements - START ########*/
 /* This is where we declared the names of the used 
-variables that will later implenmented on our code*/
+variables that will later be implemented in our code*/
 Preferences prefs; /* we add the preferences to record our seassion_id on device */
 Adafruit_NeoPixel strip(LED_COUNT, LED_GPIO, NEO_GRB + NEO_KHZ800);/*LED description that exists previous imğlementatipon*/
-SocketIOclient socketIO; /*Socket io implementation that we need to use to make Web Socket connection*/
+SocketIOclient socketIO; /*Socket IO implementation that we need to use to make Web Socket connection*/
 /*######### Global Elements - END #########*/
 
 
 
 /* ###################### URL build - START ######################*/
 std::string buildDvOpPath()
-{/* to send an open request to the database, we need to first build our own URL with
+{/* to send an open request to the database, we need to first build our URL with
 various parameters. Some names may be inconsistent due to not sharing company methods in detail.*/
   String prev = prefs.getString("session_id", "");/* to get our seassion id we firstly called session_id from "prefs" */
   std::string sParam(prev.c_str());
@@ -95,7 +95,7 @@ various parameters. Some names may be inconsistent due to not sharing company me
   path += "pts=" + std::to_string(millis());
   path += "&S[S]=" + sParam; //Inserting Seassion id that readed aon prefs
   path += "&S[ptof]=180&S[country]=225&S[lang]=tr";// essantial descirebed
-  path += "&S[serial_no]=251306200097";//device id, whic we need to record our device's oın ERP system
+  path += "&S[serial_no]=251306200097";//device id, which we need to record our device's oın the ERP system
   path += "&S[serial_no_hw]="  + std::string("724564882000"); 
   path += "&d_short_code=sample_devic";//Device name -> important for ERP to recognize
   path += "&d_firmware=sample_device";//Device name -> important for ERP to recognize
@@ -108,7 +108,7 @@ various parameters. Some names may be inconsistent due to not sharing company me
 
 /* ###################### Socket.IO Creation - START ######################*/
 std::string create_socket_message(const std::string& eventName, const std::string& message)
-{// To create the socket message in sending as out to process as message later.
+{// To create the socket message in sending as out to process as a message later.
   DynamicJsonDocument doc(1024);
   JsonArray arr = doc.to<JsonArray>();
   arr.add(eventName.c_str());
@@ -120,8 +120,8 @@ std::string create_socket_message(const std::string& eventName, const std::strin
 /* ###################### Socket.IO Creation - END ######################*/
 
 /* ###################### initI2S - START ######################*/
-/*initI2S is to used to generate analog electiracal pulses to help us 
-to create binary alarm sound. Which, we used "MAX98357A" and then send the generated
+/*initI2S is to be used to generate analog electrical pulses to help us 
+to create a binary alarm sound. Which we used "MAX98357A" and then sent the generated
 sound to speakers. */
 void initI2S() {
   i2s_config_t cfg = {
@@ -193,8 +193,6 @@ void playErrorTone()
 }
 /* ###################### playErrorTone - END ######################*/
 
-
-
 /* ###################### ReadDistance - Start ######################*/
 float readDistanceMeter()
 {/* Commanly used distance reader*/
@@ -209,12 +207,11 @@ float readDistanceMeter()
   return (duration * 0.034f) / 2.0f;
 }
 /* ###################### ReadDistance - END ######################*/
-// ----------------------------------------------------------------------------
-//  Poisson random for error simulation
+
 /* ###################### Poisson Random - START ######################*/
 int poissonRandom(double lambda)
-{/* we use this function to generate our random values to between in the possible interval
-  as well as allowed us to generate distinctive values. Thus, it might be possible to 
+{/* We use this function to generate our random values within the possible interval
+  as well as allow us to generate distinctive values. Thus, it might be possible to 
   have libraries that allowed us to generate 64 format random values to make them even more 
   related &distinctive. Yet, adding those libraries may increase the weight of our ESP32 code. 
   Which we don't want because even this version is very heavy.*/
@@ -230,28 +227,33 @@ int poissonRandom(double lambda)
   } while (p > L);
   return k - 1;
 }
-
+/* ###################### Poisson Random - END ######################*/
 // ----------------------------------------------------------------------------
 //  Handle incoming Socket.IO frames
-void socketIOEvent(socketIOmessageType_t type, uint8_t* payload, size_t len) {
+
+/* ###################### SockeetIO Frame - END ######################*/
+void socketIOEvent(socketIOmessageType_t type, uint8_t* payload, size_t len)
+{/* This part of the code handles the incoming message from socketio, and depending on the arrived message, 
+It will proceed with the set tasks. Thus, it can handle the socket messages, the socket connection status, 
+and the socket messages that are sent by the ERP system. */
   switch (type){
     case sIOtype_DISCONNECT://if our socket connection is disconnected either from a network or the ERP itself
-      socketConnected = false;
-      Serial.println("[IOc] Disconnected!");
+      socketConnected = false; // Setting connection flag to false
+      Serial.println("[IOc] Disconnected!"); // message that socket disconnected
       break;
 
-    case sIOtype_CONNECT:// if connection successful.
-      socketConnected = true;
-      Serial.printf("[IOc] Connected to url: %s\n", payload);
-      socketIO.send(sIOtype_CONNECT, "/");
-      socketIO.sendEVENT(message_register.c_str());
+    case sIOtype_CONNECT: // if connection successful.
+      socketConnected = true; // Setting the connection flag to be true
+      Serial.printf("[IOc] Connected to url: %s\n", payload); // connected message & generated URL
+      socketIO.send(sIOtype_CONNECT, "/"); 
+      socketIO.sendEVENT(message_register.c_str()); // mesage registery character string.
       break;
 
     case sIOtype_EVENT: 
-      {/*After a succesful connection, we are arriving at "SIOtype_Envent". Thus, we process the 
-      raw data that we got from payload to process. Then, we spearete our raw data in to two parts
-      frameType and data itsel.*/ 
-      String raw = String((char*)payload).substring(0, len);
+      {/*After a successful connection, we are arriving at "SIOtype_Envent". Thus, we process the 
+      raw data that we got from the  payload. Then, we separated our raw data into two parts
+      frameType and data itself.*/ 
+      String raw = String((char*)payload).substring(0, len); //Transforming payload into raw data
       DynamicJsonDocument outer(2048);
       if (deserializeJson(outer, raw)) return;
 
@@ -266,7 +268,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t* payload, size_t len) {
         int Anomaly_Count = 0;
         if (ErrorSimulationSentinelVal) 
         {
-          StrugleCount++; //Thiss value should be saved inside preferance
+          StrugleCount++; //This value should be saved inside preference
           prefs.putUInt("Strugle_Count", StrugleCount);
           Serial.println("WARNING: System UNSTABLE");
 
@@ -507,4 +509,5 @@ void loop()
     lastPingTime = millis();
   }
 }
+
 
